@@ -8,6 +8,7 @@ from django.db.backends.postgresql_psycopg2.base import *
 from django.db.backends.util import truncate_name
 from psycopg2.extras import register_hstore
 
+from django_hstore.postgresql_psycopg2.operations import DatabaseOperations
 
 log = logging.getLogger(__name__)
 # Regexp for SQL comments
@@ -133,6 +134,7 @@ class DatabaseWrapper(DatabaseWrapper):
     def __init__(self, *args, **params):
         super(DatabaseWrapper, self).__init__(*args, **params)
         self.creation = DatabaseCreation(self)
+        self.ops = DatabaseOperations(self)
 
     def _cursor(self):
         # ensure that we're connected
