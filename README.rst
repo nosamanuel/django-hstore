@@ -25,6 +25,8 @@ running::
 
     python setup.py test
 
+To run your own tests using the custom backend, set the ``HSTORE_TEMPLATE`` setting to the name of a Postgres template containing the hstore extension.
+
 Usage
 =====
 

@@ -46,59 +46,8 @@ class DatabaseCreation(DatabaseCreation):
             print >> sys.stderr, message
             traceback.print_exc()
 
-    def install_hstore_contrib(self):
-        # point to test database
-        self.connection.close()
-        test_database_name = self._get_test_db_name()
-        self.connection.settings_dict["NAME"] = test_database_name
-        # Test to see if HSTORE type was already installed
-        cursor = self.connection.cursor()
-        cursor.execute("SELECT 1 FROM pg_type WHERE typname='hstore';")
-        if cursor.fetchone():
-            # skip if already exists
-            return
-        if self.connection._version[0:2]>=(9,1):
-            cursor.execute("create extension hstore;")
-            self.connection.commit_unless_managed()
-            return
-        import glob
-        import os
-        # Quick Hack to run HSTORE sql script for test runs
-        sql = getattr(settings,'HSTORE_SQL',None)
-        if not sql:
-            # Attempt to helpfully locate contrib SQL on typical installs
-            for loc in (
-                # Ubuntu/Debian Location
-                '/usr/share/postgresql/*/contrib/hstore.sql',
-                # Redhat/RPM location
-                '/usr/share/pgsql/contrib/hstore.sql',
-                # MacOSX location
-                '/Library/PostgreSQL/*/share/postgresql/contrib/hstore.sql',
-                # MacPorts location
-                '/opt/local/share/postgresql*/contrib/hstore.sql',
-                # Mac HomeBrew location
-                '/usr/local/Cellar/postgresql/*/share/contrib/hstore.sql',
-                # Windows location
-                'C:/Program Files/PostgreSQL/*/share/contrib/hstore.sql',
-                # Windows 32-bit location
-                'C:/Program Files (x86)/PostgreSQL/*/share/contrib/hstore.sql',
-            ):
-                files = glob.glob(loc)
-                if files and len(files)>0:
-                    sql = sorted(files)[-1]
-                    log.info("Found installed HSTORE script: %s" % (sql,))
-                    break
-        if sql and os.path.isfile(sql):
-            self.executescript(sql, 'HSTORE')
-        else:
-            message = 'Valid HSTORE sql script not found.  You may need to install the postgres contrib module.\n' + \
-                'You can explicitly locate it with the HSTORE_SQL property in django settings.'
-            log.warning(message)
-            print >> sys.stderr, message
-
     def _create_test_db(self, verbosity, autoclobber):
         super(DatabaseCreation, self)._create_test_db(verbosity, autoclobber)
-        self.install_hstore_contrib()
         register_hstore(self.connection.connection, globally=True, unicode=True)
 
     def sql_indexes_for_field(self, model, f, style):
@@ -124,6 +73,13 @@ class DatabaseCreation(DatabaseCreation):
             clauses.append(';')
             return [ ' '.join(clauses) ]
         return super(DatabaseCreation, self).sql_indexes_for_field(model, f, style)
+
+    def sql_table_creation_suffix(self):
+        try:
+            template = settings.HSTORE_TEMPLATE
+            return ' TEMPLATE %s' % self.connection.ops.quote_name(template)
+        except AttributeError:
+            return super(DatabaseCreation, self).sql_table_creation_suffix()
 
 
 class DatabaseWrapper(DatabaseWrapper):
